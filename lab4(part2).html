@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Passport Data Management</title>
+  <style>
+    /* Основні стилі для форми та таблиці */
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .form-container,
+    .records-container {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #333;
+    }
+    input[type="text"],
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+    }
+    .photo-preview {
+      width: 150px;
+      height: 200px;
+      border: 1px dashed #ccc;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      background-color: #f9f9f9;
+    }
+    .photo-preview img {
+      max-width: 100%;
+      max-height: 100%;
+      display: none;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .required::after {
+      content: " *";
+      color: red;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table th,
+    table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    table th {
+      background-color: #3498db;
+      color: #fff;
+    }
+    .export-buttons {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Passport Data Management</h1>
+  
+  <!-- Форма введення даних -->
+  <div class="form-container">
+    <form id="passportForm">
+      <div class="form-group">
+        <label for="firstName" class="required">First Name</label>
+        <input type="text" id="firstName" name="firstName" required />
+      </div>
+      <div class="form-group">
+        <label for="lastName" class="required">Last Name</label>
+        <input type="text" id="lastName" name="lastName" required />
+      </div>
+      <div class="form-group">
+        <label for="patronymic">Patronymic (Middle Name)</label>
+        <input type="text" id="patronymic" name="patronymic" />
+      </div>
+      <div class="form-group">
+        <label for="address" class="required">Address</label>
+        <textarea id="address" name="address" rows="3" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="idNumber" class="required">ID Number</label>
+        <input type="text" id="idNumber" name="idNumber" pattern="[A-Za-z0-9]+"
+               title="ID should contain only letters and numbers" required />
+      </div>
+      <div class="form-group">
+        <label for="photo" class="required">Photo</label>
+        <input type="file" id="photo" name="photo" accept="image/*" required />
+        <div class="photo-preview">
+          <span id="photoPlaceholder">Preview will appear here</span>
+          <img id="photoPreview" src="" alt="Photo preview" />
+        </div>
+      </div>
+      <button type="submit" id="submitButton">Submit Passport Data</button>
+    </form>
+  </div>
+  
+  <!-- Таблиця для відображення записів -->
+  <div class="records-container">
+    <div class="export-buttons">
+      <button id="exportJSON">Export JSON</button>
+      <button id="exportXML">Export XML</button>
+    </div>
+    <table id="recordsTable">
+      <thead>
+        <tr>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Patronymic</th>
+          <th>Address</th>
+          <th>ID Number</th>
+          <th>Photo</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Динамічне наповнення записами -->
+      </tbody>
+    </table>
+  </div>
+  
+  <script>
+    // Масив для зберігання записів
+    let records = [];
+    let editIndex = -1; // -1 – режим створення, інакше – режим редагування
+
+    // Функціонал попереднього перегляду фото
+    const photoInput = document.getElementById('photo');
+    const photoPreview = document.getElementById('photoPreview');
+    const photoPlaceholder = document.getElementById('photoPlaceholder');
+
+    photoInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          photoPreview.src = e.target.result;
+          photoPreview.style.display = 'block';
+          photoPlaceholder.style.display = 'none';
+        }
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Обробка події відправки форми
+    document.getElementById('passportForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const firstName = document.getElementById('firstName').value.trim();
+      const lastName = document.getElementById('lastName').value.trim();
+      const patronymic = document.getElementById('patronymic').value.trim();
+      const address = document.getElementById('address').value.trim();
+      const idNumber = document.getElementById('idNumber').value.trim();
+      let photoData = photoPreview.src || '';
+
+      // Валідація даних
+      let errorMessage = '';
+      if (firstName.length < 2) {
+        errorMessage += 'First name must be at least 2 characters.\n';
+      }
+      if (lastName.length < 2) {
+        errorMessage += 'Last name must be at least 2 characters.\n';
+      }
+      if (address.length < 5) {
+        errorMessage += 'Address must be at least 5 characters.\n';
+      }
+      if (idNumber.length < 5) {
+        errorMessage += 'ID number must be at least 5 characters.\n';
+      }
+      if (!photoData || photoData === window.location.href) {
+        errorMessage += 'Please select a valid photo.\n';
+      }
+      if (errorMessage) {
+        alert(errorMessage);
+        return;
+      }
+
+      const record = {
+        firstName,
+        lastName,
+        patronymic,
+        address,
+        idNumber,
+        photo: photoData
+      };
+
+      if (editIndex === -1) {
+        // Створення нового запису
+        records.push(record);
+      } else {
+        // Оновлення існуючого запису
+        records[editIndex] = record;
+        editIndex = -1;
+        document.getElementById('submitButton').textContent = 'Submit Passport Data';
+      }
+
+      // Скидання форми
+      document.getElementById('passportForm').reset();
+      photoPreview.style.display = 'none';
+      photoPlaceholder.style.display = 'block';
+
+      displayRecords();
+    });
+
+    // Відображення записів у таблиці
+    function displayRecords() {
+      const tbody = document.getElementById('recordsTable').getElementsByTagName('tbody')[0];
+      tbody.innerHTML = '';
+      records.forEach((record, index) => {
+        const row = tbody.insertRow();
+        row.insertCell().textContent = record.firstName;
+        row.insertCell().textContent = record.lastName;
+        row.insertCell().textContent = record.patronymic;
+        row.insertCell().textContent = record.address;
+        row.insertCell().textContent = record.idNumber;
+        
+        const photoCell = row.insertCell();
+        if (record.photo) {
+          const img = document.createElement('img');
+          img.src = record.photo;
+          img.style.width = '50px';
+          img.style.height = '50px';
+          photoCell.appendChild(img);
+        } else {
+          photoCell.textContent = 'No photo';
+        }
+        
+        const actionsCell = row.insertCell();
+        // Кнопка редагування
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => editRecord(index));
+        actionsCell.appendChild(editBtn);
+        
+        // Кнопка видалення
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.style.marginLeft = '10px';
+        deleteBtn.addEventListener('click', () => deleteRecord(index));
+        actionsCell.appendChild(deleteBtn);
+      });
+    }
+
+    // Функція редагування запису
+    function editRecord(index) {
+      const record = records[index];
+      document.getElementById('firstName').value = record.firstName;
+      document.getElementById('lastName').value = record.lastName;
+      document.getElementById('patronymic').value = record.patronymic;
+      document.getElementById('address').value = record.address;
+      document.getElementById('idNumber').value = record.idNumber;
+      
+      if (record.photo) {
+        photoPreview.src = record.photo;
+        photoPreview.style.display = 'block';
+        photoPlaceholder.style.display = 'none';
+      }
+      
+      editIndex = index;
+      document.getElementById('submitButton').textContent = 'Update Passport Data';
+    }
+
+    // Функція видалення запису
+    function deleteRecord(index) {
+      if (confirm('Are you sure you want to delete this record?')) {
+        records.splice(index, 1);
+        displayRecords();
+      }
+    }
+
+    // Експорт даних у форматі JSON
+    function exportJSON() {
+      const dataStr = JSON.stringify(records, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'passport_records.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Експорт даних у форматі XML
+    function exportXML() {
+      let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<records>\n';
+      records.forEach(record => {
+        xmlContent += '  <record>\n';
+        xmlContent += `    <firstName>${escapeXML(record.firstName)}</firstName>\n`;
+        xmlContent += `    <lastName>${escapeXML(record.lastName)}</lastName>\n`;
+        xmlContent += `    <patronymic>${escapeXML(record.patronymic)}</patronymic>\n`;
+        xmlContent += `    <address>${escapeXML(record.address)}</address>\n`;
+        xmlContent += `    <idNumber>${escapeXML(record.idNumber)}</idNumber>\n`;
+        xmlContent += `    <photo>${escapeXML(record.photo)}</photo>\n`;
+        xmlContent += '  </record>\n';
+      });
+      xmlContent += '</records>';
+      
+      const blob = new Blob([xmlContent], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'passport_records.xml';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Функція для екранування спеціальних символів у XML
+    function escapeXML(unsafe) {
+      return unsafe.replace(/[<>&'"]/g, function(c) {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+        }
+      });
+    }
+
+    document.getElementById('exportJSON').addEventListener('click', exportJSON);
+    document.getElementById('exportXML').addEventListener('click', exportXML);
+  </script>
+</body>
+</html>
